@@ -1,10 +1,8 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { useState } from "react";
 import {
   LayoutDashboard,
   Dumbbell,
   CalendarDays,
-  Users,
   ClipboardList,
   Trophy,
   Search,
@@ -12,19 +10,30 @@ import {
   Plus,
   ChevronsUpDown,
   Sparkles,
+  Sun,
+  Flame,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Avatar } from "./ui";
-import { club } from "../data/mock";
+import { club, players } from "../data/mock";
+import { useRole, type Role } from "../context/role";
 
-const nav: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
+type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean };
+
+const coachNav: NavItem[] = [
   { to: "/app", label: "Command Center", icon: LayoutDashboard, end: true },
+  { to: "/app/squads", label: "Squads", icon: Trophy },
   { to: "/app/library", label: "Drill Library", icon: Dumbbell },
   { to: "/app/sessions", label: "Session Builder", icon: ClipboardList },
   { to: "/app/calendar", label: "Calendar", icon: CalendarDays },
-  { to: "/app/squads", label: "Squads", icon: Trophy },
-  { to: "/app/players", label: "Players", icon: Users },
+];
+
+const athleteNav: NavItem[] = [
+  { to: "/app", label: "My Day", icon: Sun, end: true },
+  { to: "/app/sessions", label: "My Sessions", icon: ClipboardList },
+  { to: "/app/calendar", label: "My Calendar", icon: CalendarDays },
+  { to: "/app/library", label: "Drill Library", icon: Dumbbell },
 ];
 
 function Logo() {
@@ -43,11 +52,14 @@ function Logo() {
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
-  const [role, setRole] = useState<"Coach" | "Athlete">("Coach");
+  const { role, setRole, athleteId } = useRole();
+  const athlete = players.find((p) => p.id === athleteId)!;
+  const isCoach = role === "coach";
+  const nav = isCoach ? coachNav : athleteNav;
 
-  function switchRole(next: "Coach" | "Athlete") {
+  function switchRole(next: Role) {
     setRole(next);
-    navigate(next === "Athlete" ? "/app/athlete" : "/app");
+    navigate("/app"); // land on the role's home so we never sit on a route it can't see
   }
 
   return (
@@ -58,20 +70,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <Logo />
         </NavLink>
 
-        {/* Club switcher */}
-        <button className="mt-6 flex items-center gap-3 rounded-xl border border-line bg-ink-700/60 p-2.5 text-left transition hover:bg-ink-600/60">
+        {/* Context switcher: club for coach, squad for athlete */}
+        <div className="mt-6 flex items-center gap-3 rounded-xl border border-line bg-ink-700/60 p-2.5 text-left">
           <div className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-br from-plasma to-viol font-display text-sm font-bold text-white">
-            N
+            {isCoach ? "N" : athlete.number}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold">{club.name}</div>
-            <div className="text-[11px] text-fg-dim">{club.season} · {club.sport}</div>
+            <div className="truncate text-sm font-semibold">{isCoach ? club.name : athlete.name}</div>
+            <div className="text-[11px] text-fg-dim">
+              {isCoach ? `${club.season} · ${club.sport}` : `${athlete.position} · ${athlete.squad}`}
+            </div>
           </div>
-          <ChevronsUpDown className="h-4 w-4 text-fg-dim" />
-        </button>
+          {isCoach && <ChevronsUpDown className="h-4 w-4 text-fg-dim" />}
+        </div>
 
         <nav className="mt-6 flex flex-1 flex-col gap-1">
-          <div className="label-eyebrow px-3 pb-2">Workspace</div>
+          <div className="label-eyebrow px-3 pb-2">{isCoach ? "Workspace" : "My Training"}</div>
           {nav.map((n) => (
             <NavLink
               key={n.to}
@@ -96,18 +110,31 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           ))}
 
           <div className="mt-auto">
-            {/* AI assistant teaser */}
-            <div className="relative overflow-hidden rounded-2xl border border-volt/20 bg-gradient-to-br from-volt/10 to-transparent p-4">
-              <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-volt/20 blur-2xl" />
-              <Sparkles className="h-5 w-5 text-volt" />
-              <div className="mt-2 text-sm font-semibold">GPM Copilot</div>
-              <p className="mt-1 text-[11px] leading-relaxed text-fg-muted">
-                Auto-build a periodized week from your squad's readiness.
-              </p>
-              <button className="mt-3 w-full rounded-lg bg-volt/15 py-1.5 text-xs font-semibold text-volt transition hover:bg-volt/25">
-                Generate plan
-              </button>
-            </div>
+            {isCoach ? (
+              <div className="relative overflow-hidden rounded-2xl border border-volt/20 bg-gradient-to-br from-volt/10 to-transparent p-4">
+                <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-volt/20 blur-2xl" />
+                <Sparkles className="h-5 w-5 text-volt" />
+                <div className="mt-2 text-sm font-semibold">GPM Copilot</div>
+                <p className="mt-1 text-[11px] leading-relaxed text-fg-muted">
+                  Auto-build a periodized week from your squad's readiness.
+                </p>
+                <button className="mt-3 w-full rounded-lg bg-volt/15 py-1.5 text-xs font-semibold text-volt transition hover:bg-volt/25">
+                  Generate plan
+                </button>
+              </div>
+            ) : (
+              <div className="relative overflow-hidden rounded-2xl border border-volt/20 bg-gradient-to-br from-volt/10 to-transparent p-4">
+                <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-volt/20 blur-2xl" />
+                <div className="flex items-center gap-2">
+                  <Flame className="h-5 w-5 text-volt" />
+                  <span className="stat-num text-lg font-bold text-volt">12</span>
+                </div>
+                <div className="mt-1 text-sm font-semibold">Day training streak</div>
+                <p className="mt-1 text-[11px] leading-relaxed text-fg-muted">
+                  3 sessions completed this week. Keep it going 🔥
+                </p>
+              </div>
+            )}
           </div>
         </nav>
       </aside>
@@ -118,18 +145,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-base/80 px-5 py-3.5 backdrop-blur-xl">
           <div className="flex flex-1 items-center gap-2 rounded-xl border border-line bg-ink-800/60 px-3 py-2 text-sm text-fg-dim md:max-w-md">
             <Search className="h-4 w-4" />
-            <span className="hidden md:inline">Search drills, players, sessions…</span>
+            <span className="hidden md:inline">
+              {isCoach ? "Search drills, players, sessions…" : "Search drills…"}
+            </span>
             <kbd className="ml-auto hidden rounded border border-line px-1.5 py-0.5 text-[10px] text-fg-dim md:inline">⌘K</kbd>
           </div>
 
           {/* Role switcher */}
           <div className="flex items-center rounded-xl border border-line bg-ink-800/60 p-0.5 text-xs font-semibold">
-            {(["Coach", "Athlete"] as const).map((r) => (
+            {(["coach", "athlete"] as const).map((r) => (
               <button
                 key={r}
                 onClick={() => switchRole(r)}
                 className={cn(
-                  "rounded-lg px-3 py-1.5 transition",
+                  "rounded-lg px-3 py-1.5 capitalize transition",
                   role === r ? "bg-volt text-base" : "text-fg-muted hover:text-fg"
                 )}
               >
@@ -138,14 +167,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             ))}
           </div>
 
-          <button className="btn-volt hidden sm:inline-flex">
-            <Plus className="h-4 w-4" /> New session
-          </button>
+          {isCoach && (
+            <button onClick={() => navigate("/app/sessions")} className="btn-volt hidden sm:inline-flex">
+              <Plus className="h-4 w-4" /> New session
+            </button>
+          )}
           <button className="relative grid h-9 w-9 place-items-center rounded-xl border border-line bg-ink-800/60 text-fg-muted transition hover:text-fg">
             <Bell className="h-[18px] w-[18px]" />
             <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-volt" />
           </button>
-          <Avatar name="Henrik Sørensen" size={36} />
+          <Avatar name={isCoach ? "Henrik Sørensen" : athlete.name} size={36} />
         </header>
 
         <main className="flex-1 px-5 py-6 md:px-7">{children}</main>

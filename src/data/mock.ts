@@ -405,3 +405,168 @@ export const intensityColor: Record<Intensity, string> = {
   High: "#FF8A5B",
   Max: "#FF5E6C",
 };
+
+// ─────────────────────────────────────────────────────────────────────────
+// Deeper player detail — daily activity log, training history, benchmarks.
+// Derived deterministically from each player so every profile feels unique
+// without hand-authoring 12× the data.
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface DailyActivity {
+  label: string;
+  category: DrillCategory;
+  status: "Completed" | "Assigned" | "Missed";
+}
+export interface DailyLogEntry {
+  date: string;
+  weekday: string;
+  readiness: number;
+  load: number;
+  compliance: number; // %
+  activities: DailyActivity[];
+}
+export interface TrainingHistoryEntry {
+  date: string;
+  session: string;
+  type: ScheduleEvent["type"];
+  load: number;
+  duration: number; // minutes
+  compliance: number; // %
+  status: "Completed" | "Partial" | "Missed";
+}
+export interface Benchmark {
+  metric: string;
+  unit: string;
+  target: number;
+  actual: number;
+  /** true when a lower value is better (e.g. sprint times). */
+  lowerIsBetter: boolean;
+  delta: number; // vs previous test, signed
+}
+
+function seeded(id: string) {
+  let s = 0;
+  for (let i = 0; i < id.length; i++) s = (s * 31 + id.charCodeAt(i)) % 100000;
+  return () => {
+    s = (s * 1103515245 + 12345) % 2147483648;
+    return s / 2147483648;
+  };
+}
+
+const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const activityPool: { label: string; category: DrillCategory }[] = [
+  { label: "Rondo Pressure Cooker", category: "Technical" },
+  { label: "Positional Build-Up", category: "Tactical" },
+  { label: "Nordic Power Complex", category: "Strength & Conditioning" },
+  { label: "Reactive Agility Ladder", category: "Speed & Agility" },
+  { label: "Tempo Interval Engine", category: "Cardio" },
+  { label: "Active Recovery Flow", category: "Recovery" },
+  { label: "Finishing Carousel", category: "Technical" },
+  { label: "Hamstring Resilience Set", category: "Strength & Conditioning" },
+];
+
+export function getDailyLog(p: Player): DailyLogEntry[] {
+  const rnd = seeded(p.id + "log");
+  const days = 5;
+  return Array.from({ length: days }).map((_, i) => {
+    const ago = days - 1 - i;
+    const n = 2 + Math.floor(rnd() * 2);
+    const activities: DailyActivity[] = Array.from({ length: n }).map(() => {
+      const a = activityPool[Math.floor(rnd() * activityPool.length)];
+      const roll = rnd();
+      const status: DailyActivity["status"] =
+        ago === 0 ? (roll > 0.5 ? "Assigned" : "Completed") : roll > 0.88 ? "Missed" : "Completed";
+      return { ...a, status };
+    });
+    const done = activities.filter((a) => a.status === "Completed").length;
+    return {
+      date: `${17 - ago} Jun`,
+      weekday: dayNames[(2 + i) % 7],
+      readiness: Math.max(50, Math.min(99, Math.round(p.readiness + (rnd() * 14 - 7)))),
+      load: Math.round(220 + rnd() * 260),
+      compliance: activities.length ? Math.round((done / activities.length) * 100) : 100,
+      activities,
+    };
+  });
+}
+
+export function getTrainingHistory(p: Player): TrainingHistoryEntry[] {
+  const rnd = seeded(p.id + "hist");
+  const sessions = [
+    { session: "Activation & Rondo", type: "Training" as const },
+    { session: "Possession & Build-Up", type: "Training" as const },
+    { session: "Strength · Lower", type: "Gym" as const },
+    { session: "Transition Wave", type: "Training" as const },
+    { session: "Recovery Flow", type: "Recovery" as const },
+    { session: "Finishing & SSG", type: "Training" as const },
+    { session: "Tactical Walkthrough", type: "Analysis" as const },
+    { session: "League Match", type: "Match" as const },
+  ];
+  return sessions.map((s, i) => {
+    const roll = rnd();
+    const status: TrainingHistoryEntry["status"] =
+      roll > 0.9 ? "Missed" : roll > 0.78 ? "Partial" : "Completed";
+    const compliance = status === "Completed" ? 90 + Math.round(rnd() * 10) : status === "Partial" ? 50 + Math.round(rnd() * 30) : 0;
+    return {
+      date: `${16 - i} Jun`,
+      session: s.session,
+      type: s.type,
+      load: 180 + Math.round(rnd() * 380),
+      duration: 45 + Math.round(rnd() * 50),
+      compliance,
+      status,
+    };
+  });
+}
+
+export function getBenchmarks(p: Player): Benchmark[] {
+  const rnd = seeded(p.id + "bench");
+  const f = (base: number, spread: number) => base + (rnd() - 0.5) * spread;
+  return [
+    { metric: "30m Sprint", unit: "s", target: 4.05, actual: +f(4.12, 0.25).toFixed(2), lowerIsBetter: true, delta: -0.06 },
+    { metric: "Yo-Yo IR1", unit: "m", target: 2200, actual: Math.round(f(2040, 360)), lowerIsBetter: false, delta: 120 },
+    { metric: "CMJ Jump", unit: "cm", target: 48, actual: Math.round(f(44, 9)), lowerIsBetter: false, delta: 2 },
+    { metric: "5-10-5 Agility", unit: "s", target: 4.4, actual: +f(4.52, 0.3).toFixed(2), lowerIsBetter: true, delta: -0.08 },
+    { metric: "Max Velocity", unit: "km/h", target: 34, actual: +f(32.4, 3).toFixed(1), lowerIsBetter: false, delta: 0.7 },
+    { metric: "Pass Completion", unit: "%", target: 88, actual: Math.round(f(83, 12)), lowerIsBetter: false, delta: 3 },
+  ];
+}
+
+// Athlete-facing: sessions the coach has assigned to the demo athlete.
+export interface AssignedSession {
+  id: string;
+  name: string;
+  date: string;
+  day: string;
+  status: "Completed" | "Today" | "Upcoming";
+  focus: string;
+  blocks: SessionBlock[];
+  editable: boolean;
+}
+
+export const assignedSessions: AssignedSession[] = [
+  {
+    id: "as1", name: "Possession & Build-Up", date: "Mon 16 Jun", day: "Mon", status: "Completed",
+    focus: "Technical · build-up patterns",
+    blocks: [{ drillId: "d8", minutes: 12 }, { drillId: "d1", minutes: 20 }, { drillId: "d9", minutes: 25 }],
+    editable: false,
+  },
+  {
+    id: "as2", name: "Strength · Lower Body", date: "Tue 17 Jun", day: "Tue", status: "Completed",
+    focus: "Power & resilience",
+    blocks: [{ drillId: "d3", minutes: 35 }, { drillId: "d11", minutes: 20 }],
+    editable: false,
+  },
+  {
+    id: "as3", name: "Matchday –1 · Activation", date: "Thu 19 Jun", day: "Thu", status: "Today",
+    focus: "Sharpness, low volume, high quality",
+    blocks: [{ drillId: "d8", minutes: 12 }, { drillId: "d4", minutes: 15 }, { drillId: "d6", minutes: 18 }, { drillId: "d12", minutes: 20 }],
+    editable: true,
+  },
+  {
+    id: "as4", name: "Recovery & Mobility", date: "Sun 22 Jun", day: "Sun", status: "Upcoming",
+    focus: "Regeneration post-match",
+    blocks: [{ drillId: "d8", minutes: 25 }],
+    editable: true,
+  },
+];

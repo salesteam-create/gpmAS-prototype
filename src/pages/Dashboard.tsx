@@ -191,7 +191,7 @@ export default function Dashboard() {
               {squads.map((s) => (
                 <Link
                   key={s.id}
-                  to="/app/squads"
+                  to={`/app/squads/${s.id}`}
                   className="panel group flex items-center gap-4 p-4 transition hover:border-line2"
                 >
                   <Ring value={s.avgReadiness} color={s.color} size={56} stroke={5} />

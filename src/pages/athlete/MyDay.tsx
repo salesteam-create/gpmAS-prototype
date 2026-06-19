@@ -1,21 +1,24 @@
-import { PlayCircle, Clock, Flame, CheckCircle2, Circle, Trophy, Calendar } from "lucide-react";
-import { Avatar, Ring, StatBar } from "../components/ui";
-import { drills, sessionTemplate, categoryMeta, intensityColor, players } from "../data/mock";
-
-const me = players[0]; // Eskil Hauge
+import { Link } from "react-router-dom";
+import { PlayCircle, Clock, Flame, CheckCircle2, Circle, Trophy, Calendar, ChevronRight, ArrowRight } from "lucide-react";
+import { Avatar, Ring, StatBar } from "../../components/ui";
+import { drills, assignedSessions, categoryMeta, intensityColor, players } from "../../data/mock";
+import { useRole } from "../../context/role";
 
 const weekPlan = [
-  { day: "Mon", label: "Activation & Rondo", done: true },
-  { day: "Tue", label: "Possession & Build-Up", done: true },
+  { day: "Mon", label: "Possession & Build-Up", done: true },
+  { day: "Tue", label: "Strength · Lower Body", done: true },
   { day: "Wed", label: "Recovery + Analysis", done: true },
-  { day: "Thu", label: "Power Complex", done: false, today: true },
-  { day: "Fri", label: "Matchday –1 Activation", done: false },
+  { day: "Thu", label: "Matchday –1 Activation", done: false, today: true },
+  { day: "Fri", label: "Team Activation", done: false },
   { day: "Sat", label: "League Match", done: false, match: true },
-  { day: "Sun", label: "Recovery Flow", done: false },
+  { day: "Sun", label: "Recovery & Mobility", done: false },
 ];
 
-export default function AthleteView() {
-  const todayDrills = sessionTemplate.blocks.map((b) => ({ drill: drills.find((d) => d.id === b.drillId)!, minutes: b.minutes }));
+export default function MyDay() {
+  const { athleteId } = useRole();
+  const me = players.find((p) => p.id === athleteId)!;
+  const today = assignedSessions.find((s) => s.status === "Today") ?? assignedSessions[0];
+  const todayDrills = today.blocks.map((b) => ({ drill: drills.find((d) => d.id === b.drillId)!, minutes: b.minutes }));
 
   return (
     <div className="space-y-6">
@@ -26,15 +29,13 @@ export default function AthleteView() {
           <div className="flex items-center gap-4">
             <Avatar name={me.name} size={64} />
             <div>
-              <div className="label-eyebrow">Athlete view</div>
+              <div className="label-eyebrow">My Day · Thu 19 Jun</div>
               <h1 className="font-display text-2xl font-bold tracking-tight">Hi {me.name.split(" ")[0]} 👋</h1>
               <p className="mt-0.5 text-sm text-fg-muted">{me.position} · {me.squad} · #{me.number}</p>
             </div>
           </div>
           <div className="flex items-center gap-5">
-            <div className="text-center">
-              <Ring value={me.readiness} size={72} color="#C6F24E" label="Ready" />
-            </div>
+            <Ring value={me.readiness} size={72} color="#C6F24E" label="Ready" />
             <div className="hidden sm:block">
               <div className="text-[11px] text-fg-dim">Your form</div>
               <div className="stat-num text-2xl font-bold text-good">+{me.form}</div>
@@ -49,10 +50,12 @@ export default function AthleteView() {
         <div className="lg:col-span-2">
           <div className="mb-3 flex items-end justify-between">
             <div>
-              <div className="label-eyebrow">Today · Thu 19 Jun</div>
-              <h2 className="mt-1 font-display text-lg font-semibold">{sessionTemplate.name}</h2>
+              <div className="label-eyebrow">Assigned for today</div>
+              <h2 className="mt-1 font-display text-lg font-semibold">{today.name}</h2>
             </div>
-            <span className="chip"><Clock className="h-3.5 w-3.5" /> {todayDrills.reduce((s, t) => s + t.minutes, 0)} min</span>
+            <Link to="/app/sessions" className="chip transition hover:border-volt/40 hover:text-volt">
+              <Clock className="h-3.5 w-3.5" /> {todayDrills.reduce((s, t) => s + t.minutes, 0)} min · open
+            </Link>
           </div>
 
           <div className="space-y-3">
@@ -76,28 +79,26 @@ export default function AthleteView() {
               );
             })}
           </div>
+
+          <Link to="/app/sessions" className="mt-3 flex items-center justify-center gap-1.5 rounded-xl border border-volt/30 bg-volt/10 py-3 text-sm font-semibold text-volt transition hover:bg-volt/15">
+            Adjust or start this session <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
 
         {/* Side: week + goals */}
         <div className="space-y-6">
           <div className="panel p-5">
-            <div className="mb-3 flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-volt" />
-              <h3 className="font-display font-semibold">Your week</h3>
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-volt" />
+                <h3 className="font-display font-semibold">My week</h3>
+              </div>
+              <Link to="/app/calendar" className="text-[11px] font-semibold text-volt">Full calendar <ChevronRight className="inline h-3 w-3" /></Link>
             </div>
             <div className="space-y-1.5">
               {weekPlan.map((d) => (
-                <div
-                  key={d.day}
-                  className={`flex items-center gap-3 rounded-lg px-2.5 py-2 ${d.today ? "border border-volt/30 bg-volt/10" : ""}`}
-                >
-                  {d.done ? (
-                    <CheckCircle2 className="h-4 w-4 text-good" />
-                  ) : d.match ? (
-                    <Trophy className="h-4 w-4 text-bad" />
-                  ) : (
-                    <Circle className="h-4 w-4 text-fg-dim" />
-                  )}
+                <div key={d.day} className={`flex items-center gap-3 rounded-lg px-2.5 py-2 ${d.today ? "border border-volt/30 bg-volt/10" : ""}`}>
+                  {d.done ? <CheckCircle2 className="h-4 w-4 text-good" /> : d.match ? <Trophy className="h-4 w-4 text-bad" /> : <Circle className="h-4 w-4 text-fg-dim" />}
                   <span className="w-9 text-xs font-semibold text-fg-dim">{d.day}</span>
                   <span className={`flex-1 text-sm ${d.done ? "text-fg-dim line-through" : d.today ? "font-semibold text-volt" : "text-fg-muted"}`}>{d.label}</span>
                 </div>
@@ -106,7 +107,7 @@ export default function AthleteView() {
           </div>
 
           <div className="panel p-5">
-            <h3 className="mb-3 font-display font-semibold">Development goals</h3>
+            <h3 className="mb-3 font-display font-semibold">My development goals</h3>
             <div className="space-y-4">
               {[
                 { l: "Finishing conversion", v: 88, t: "Target 90%" },
