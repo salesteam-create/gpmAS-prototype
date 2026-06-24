@@ -12,9 +12,11 @@ import {
   Check,
   Sparkles,
   SlidersHorizontal,
+  Send,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Badge } from "../components/ui";
+import AssignDialog from "../components/AssignDialog";
 import {
   drills,
   categoryMeta,
@@ -116,6 +118,7 @@ function DrillCard({ drill, onOpen }: { drill: Drill; onOpen: () => void }) {
 function DrillModal({ drill, onClose }: { drill: Drill; onClose: () => void }) {
   const cat = categoryMeta[drill.category];
   const [added, setAdded] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
   return (
     <motion.div
       className="fixed inset-0 z-50 grid place-items-center p-4"
@@ -229,10 +232,17 @@ function DrillModal({ drill, onClose }: { drill: Drill; onClose: () => void }) {
             >
               {added ? <><Check className="h-4 w-4" /> Added to session</> : <><Plus className="h-4 w-4" /> Add to session</>}
             </button>
-            <button className="btn-ghost">Assign to squad</button>
+            <button onClick={() => setAssignOpen(true)} className="btn-ghost">
+              <Send className="h-4 w-4" /> Assign
+            </button>
           </div>
         </div>
       </motion.div>
+      <AnimatePresence>
+        {assignOpen && (
+          <AssignDialog open onClose={() => setAssignOpen(false)} title={drill.title} drillIds={[drill.id]} kind="drill" />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

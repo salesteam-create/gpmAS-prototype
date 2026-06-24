@@ -12,6 +12,7 @@ import {
   Search,
   Sparkles,
   Dumbbell,
+  Inbox as InboxIcon,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import {
@@ -21,26 +22,72 @@ import {
   intensityColor,
   type Intensity,
 } from "../../data/mock";
+import { useStore, reachesAthlete, targetLabel } from "../../context/store";
+import { useRole } from "../../context/role";
 
 const intensityWeight: Record<Intensity, number> = { Low: 1, Moderate: 2, High: 3, Max: 4 };
 
-const statusTone = (s: string) => (s === "Completed" ? "good" : s === "Today" ? "volt" : "plasma");
+type Item = {
+  id: string;
+  name: string;
+  date: string;
+  status: string;
+  focus: string;
+  drillIds: string[];
+  editable: boolean;
+  fromCoach?: boolean;
+};
 
 export default function MySessions() {
-  // Editable block lists keyed by session id (+ a personal one).
-  const [blocksById, setBlocksById] = useState<Record<string, string[]>>(() => {
-    const init: Record<string, string[]> = { personal: [] };
-    assignedSessions.forEach((s) => (init[s.id] = s.blocks.map((b) => b.drillId)));
-    return init;
-  });
-  const [selected, setSelected] = useState<string>(assignedSessions.find((s) => s.status === "Today")?.id ?? assignedSessions[0].id);
-  const [completed, setCompleted] = useState<Set<string>>(new Set(assignedSessions.filter((s) => s.status === "Completed").map((s) => s.id)));
+  const { assignments } = useStore();
+  const { athleteId } = useRole();
+
+  // Live coach assignments addressed to this athlete (drill or session).
+  const coachItems: Item[] = useMemo(
+    () =>
+      assignments
+        .filter((a) => reachesAthlete(a.targetType, a.targetId, athleteId))
+        .map((a) => ({
+          id: a.id,
+          name: a.title,
+          date: a.date,
+          status: "New",
+          focus: a.note ? a.note : `${a.kind === "drill" ? "Drill" : "Session"} · to ${targetLabel(a.targetType, a.targetId)}`,
+          drillIds: a.drillIds,
+          editable: true,
+          fromCoach: true,
+        })),
+    [assignments, athleteId]
+  );
+
+  const baseItems: Item[] = assignedSessions.map((s) => ({
+    id: s.id,
+    name: s.name,
+    date: s.date,
+    status: s.status,
+    focus: s.focus,
+    drillIds: s.blocks.map((b) => b.drillId),
+    editable: s.editable,
+  }));
+
+  const items = [...coachItems, ...baseItems];
+  const itemById = (id: string) => items.find((i) => i.id === id);
+
+  const [blocksById, setBlocksById] = useState<Record<string, string[]>>({ personal: [] });
+  const [selected, setSelected] = useState<string>(
+    baseItems.find((s) => s.status === "Today")?.id ?? baseItems[0]?.id ?? "personal"
+  );
+  const [completed, setCompleted] = useState<Set<string>>(
+    new Set(assignedSessions.filter((s) => s.status === "Completed").map((s) => s.id))
+  );
   const [query, setQuery] = useState("");
 
   const isPersonal = selected === "personal";
-  const session = assignedSessions.find((s) => s.id === selected);
-  const editable = isPersonal || !!session?.editable;
-  const blockIds = blocksById[selected] ?? [];
+  const current = itemById(selected);
+  const editable = isPersonal || !!current?.editable;
+
+  const baseBlocksFor = (id: string) => (id === "personal" ? [] : itemById(id)?.drillIds ?? []);
+  const blockIds = blocksById[selected] ?? baseBlocksFor(selected);
   const blocks = blockIds.map((id) => drills.find((d) => d.id === id)!).filter(Boolean);
   const totalMin = blocks.reduce((s, d) => s + d.duration, 0);
   const loadScore = blocks.reduce((s, d) => s + d.duration * intensityWeight[d.intensity], 0);
@@ -48,7 +95,8 @@ export default function MySessions() {
 
   const palette = useMemo(() => drills.filter((d) => !query || d.title.toLowerCase().includes(query.toLowerCase())), [query]);
 
-  const setBlocks = (fn: (b: string[]) => string[]) => setBlocksById((m) => ({ ...m, [selected]: fn(m[selected] ?? []) }));
+  const setBlocks = (fn: (b: string[]) => string[]) =>
+    setBlocksById((m) => ({ ...m, [selected]: fn(m[selected] ?? baseBlocksFor(selected)) }));
   const add = (id: string) => setBlocks((b) => [...b, id]);
   const remove = (i: number) => setBlocks((b) => b.filter((_, idx) => idx !== i));
   const move = (i: number, dir: -1 | 1) =>
@@ -71,8 +119,26 @@ export default function MySessions() {
       <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
         {/* Session list */}
         <div className="space-y-2">
-          <div className="label-eyebrow px-1">Assigned to me</div>
-          {assignedSessions.map((s) => {
+          {coachItems.length > 0 && <div className="label-eyebrow px-1">Newly assigned</div>}
+          {coachItems.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => setSelected(s.id)}
+              className={cn(
+                "panel w-full p-4 text-left transition",
+                selected === s.id ? "border-volt/50 shadow-[inset_0_0_0_1px_rgba(198,242,78,0.3)]" : "border-volt/30 hover:border-volt/50"
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold">{s.name}</span>
+                <span className="chip chip-active"><Sparkles className="h-3 w-3" /> New</span>
+              </div>
+              <div className="mt-1 text-[11px] text-fg-dim">{s.date} · {s.focus}</div>
+            </button>
+          ))}
+
+          <div className="label-eyebrow px-1 pt-2">Assigned to me</div>
+          {baseItems.map((s) => {
             const done = completed.has(s.id);
             return (
               <button
@@ -85,7 +151,7 @@ export default function MySessions() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold">{s.name}</span>
-                  <span className={cn("chip", `chip-active`)} style={{ opacity: 0.95 }}>
+                  <span className="chip chip-active">
                     {done ? <CheckCircle2 className="h-3 w-3" /> : s.editable ? null : <Lock className="h-3 w-3" />}
                     {done ? "Done" : s.status}
                   </span>
@@ -112,10 +178,11 @@ export default function MySessions() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="font-display text-xl font-bold tracking-tight">{isPersonal ? "My personal session" : session!.name}</h2>
+                  <h2 className="font-display text-xl font-bold tracking-tight">{isPersonal ? "My personal session" : current!.name}</h2>
+                  {current?.fromCoach && <span className="chip chip-active"><InboxIcon className="h-3 w-3" /> From coach</span>}
                   {!editable && <span className="chip"><Lock className="h-3 w-3" /> Locked</span>}
                 </div>
-                <div className="mt-1 text-sm text-fg-muted">{isPersonal ? "Build something for yourself" : session!.focus}</div>
+                <div className="mt-1 text-sm text-fg-muted">{isPersonal ? "Build something for yourself" : current!.focus}</div>
               </div>
               {!isPersonal && (
                 <button

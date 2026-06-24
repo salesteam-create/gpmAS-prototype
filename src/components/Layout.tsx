@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   LayoutDashboard,
   Dumbbell,
@@ -12,12 +13,15 @@ import {
   Sparkles,
   Sun,
   Flame,
+  MessageSquare,
+  Inbox as InboxIcon,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Avatar } from "./ui";
 import { club, players } from "../data/mock";
 import { useRole, type Role } from "../context/role";
+import { useStore, reachesAthlete } from "../context/store";
 
 type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean };
 
@@ -27,6 +31,7 @@ const coachNav: NavItem[] = [
   { to: "/app/library", label: "Drill Library", icon: Dumbbell },
   { to: "/app/sessions", label: "Session Builder", icon: ClipboardList },
   { to: "/app/calendar", label: "Calendar", icon: CalendarDays },
+  { to: "/app/messages", label: "Messages", icon: MessageSquare },
 ];
 
 const athleteNav: NavItem[] = [
@@ -34,6 +39,7 @@ const athleteNav: NavItem[] = [
   { to: "/app/sessions", label: "My Sessions", icon: ClipboardList },
   { to: "/app/calendar", label: "My Calendar", icon: CalendarDays },
   { to: "/app/library", label: "Drill Library", icon: Dumbbell },
+  { to: "/app/inbox", label: "Inbox", icon: InboxIcon },
 ];
 
 function Logo() {
@@ -53,9 +59,16 @@ function Logo() {
 export default function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const { role, setRole, athleteId } = useRole();
+  const { messages, toasts } = useStore();
   const athlete = players.find((p) => p.id === athleteId)!;
   const isCoach = role === "coach";
   const nav = isCoach ? coachNav : athleteNav;
+
+  const unread = messages.filter((m) =>
+    isCoach
+      ? m.fromRole === "athlete" && !m.read
+      : m.fromRole === "coach" && !m.read && reachesAthlete(m.targetType, m.targetId, athleteId)
+  ).length;
 
   function switchRole(next: Role) {
     setRole(next);
@@ -172,14 +185,43 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <Plus className="h-4 w-4" /> New session
             </button>
           )}
-          <button className="relative grid h-9 w-9 place-items-center rounded-xl border border-line bg-ink-800/60 text-fg-muted transition hover:text-fg">
+          <button
+            onClick={() => navigate(isCoach ? "/app/messages" : "/app/inbox")}
+            className="relative grid h-9 w-9 place-items-center rounded-xl border border-line bg-ink-800/60 text-fg-muted transition hover:text-fg"
+          >
             <Bell className="h-[18px] w-[18px]" />
-            <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-volt" />
+            {unread > 0 && (
+              <span className="stat-num absolute -right-1.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-volt px-1 text-[10px] font-bold text-base">
+                {unread}
+              </span>
+            )}
           </button>
           <Avatar name={isCoach ? "Henrik Sørensen" : athlete.name} size={36} />
         </header>
 
         <main className="flex-1 px-5 py-6 md:px-7">{children}</main>
+      </div>
+
+      {/* Toast viewport */}
+      <div className="pointer-events-none fixed bottom-5 right-5 z-[80] flex flex-col gap-2">
+        <AnimatePresence>
+          {toasts.map((t) => (
+            <motion.div
+              key={t.id}
+              initial={{ opacity: 0, x: 40, scale: 0.95 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 40, scale: 0.95 }}
+              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              className="pointer-events-auto flex items-center gap-2.5 rounded-xl border border-line2 bg-ink-800/95 px-4 py-3 text-sm shadow-float backdrop-blur"
+            >
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ background: t.tone === "good" ? "#3FD79A" : t.tone === "plasma" ? "#5B8CFF" : "#C6F24E" }}
+              />
+              <span className="font-medium text-fg">{t.text}</span>
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
     </div>
   );

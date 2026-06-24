@@ -12,6 +12,7 @@ import {
   Search,
 } from "lucide-react";
 import { cn } from "../lib/utils";
+import AssignDialog from "../components/AssignDialog";
 import {
   drills,
   categoryMeta,
@@ -27,6 +28,7 @@ export default function SessionBuilder() {
   const [blockIds, setBlockIds] = useState<string[]>(sessionTemplate.blocks.map((b) => b.drillId));
   const [query, setQuery] = useState("");
   const [squad, setSquad] = useState("Senior Squad");
+  const [assignOpen, setAssignOpen] = useState(false);
 
   const palette = useMemo(
     () => drills.filter((d) => !query || d.title.toLowerCase().includes(query.toLowerCase())),
@@ -55,9 +57,21 @@ export default function SessionBuilder() {
         </div>
         <div className="flex items-center gap-2">
           <button className="btn-ghost"><Save className="h-4 w-4" /> Save template</button>
-          <button className="btn-volt"><Send className="h-4 w-4" /> Assign to squad</button>
+          <button onClick={() => setAssignOpen(true)} className="btn-volt"><Send className="h-4 w-4" /> Assign session</button>
         </div>
       </div>
+
+      <AnimatePresence>
+        {assignOpen && (
+          <AssignDialog
+            open
+            onClose={() => setAssignOpen(false)}
+            title={sessionTemplate.name}
+            drillIds={blockIds}
+            kind="session"
+          />
+        )}
+      </AnimatePresence>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1.3fr]">
         {/* Palette */}

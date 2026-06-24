@@ -3,6 +3,7 @@ import { PlayCircle, Clock, Flame, CheckCircle2, Circle, Trophy, Calendar, Chevr
 import { Avatar, Ring, StatBar } from "../../components/ui";
 import { drills, assignedSessions, categoryMeta, intensityColor, players } from "../../data/mock";
 import { useRole } from "../../context/role";
+import { useStore, reachesAthlete } from "../../context/store";
 
 const weekPlan = [
   { day: "Mon", label: "Possession & Build-Up", done: true },
@@ -16,9 +17,11 @@ const weekPlan = [
 
 export default function MyDay() {
   const { athleteId } = useRole();
+  const { assignments } = useStore();
   const me = players.find((p) => p.id === athleteId)!;
   const today = assignedSessions.find((s) => s.status === "Today") ?? assignedSessions[0];
   const todayDrills = today.blocks.map((b) => ({ drill: drills.find((d) => d.id === b.drillId)!, minutes: b.minutes }));
+  const newFromCoach = assignments.filter((a) => reachesAthlete(a.targetType, a.targetId, athleteId));
 
   return (
     <div className="space-y-6">
@@ -44,6 +47,27 @@ export default function MyDay() {
           </div>
         </div>
       </div>
+
+      {newFromCoach.length > 0 && (
+        <Link
+          to="/app/sessions"
+          className="flex items-center gap-3 rounded-2xl border border-volt/30 bg-gradient-to-r from-volt/10 to-transparent p-4 transition hover:border-volt/50"
+        >
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-volt/15 text-volt">
+            <PlayCircle className="h-5 w-5" />
+          </div>
+          <div className="flex-1">
+            <div className="text-sm font-semibold">
+              {newFromCoach.length} new {newFromCoach.length === 1 ? "item" : "items"} assigned by your coach
+            </div>
+            <div className="text-[12px] text-fg-muted">
+              {newFromCoach.slice(0, 2).map((a) => a.title).join(", ")}
+              {newFromCoach.length > 2 ? ` +${newFromCoach.length - 2} more` : ""} — tap to review
+            </div>
+          </div>
+          <ArrowRight className="h-5 w-5 text-volt" />
+        </Link>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Today's session */}
